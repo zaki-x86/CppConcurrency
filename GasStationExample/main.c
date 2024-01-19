@@ -6,6 +6,7 @@
 
 int fuel = 0;
 pthread_mutex_t fuel_mutex;
+pthread_cond_t fuel_cond;
 
 void* fuel_filling(void* arg) {
     printf("Filling started\n");
@@ -17,6 +18,7 @@ void* fuel_filling(void* arg) {
         pthread_mutex_unlock(&fuel_mutex);
         sleep(1); // 1 second break after each refueling
     }
+    pthread_cond_signal(&fuel_cond); // signal that the tank is filled
     printf("Total filled in tank is %d liters\n", fuel);
 }
 
@@ -24,16 +26,18 @@ void* car(void* args) {
     int tank = 0;
     printf("Car fueling has started\n");
     pthread_mutex_lock(&fuel_mutex);
+    pthread_cond_init(&fuel_cond, NULL);
     while (fuel < 20 && tank < 100) {
         printf("Not enough fuel. waiting\n");
-        sleep(1); // wait
+        pthread_cond_wait(&fuel_cond, &fuel_mutex); // wait
+        // wait is equivalent to: unlock mutex -> wait -> lock mutex
     } 
     fuel -= 15;
     tank += 15;
     printf("Car fueling. Left in the main facility: %d\n", fuel);
     printf("Car fueling. Filled in car tank: %d\n", tank);
     pthread_mutex_unlock(&fuel_mutex);
-    if (tank == 100)
+    if (tank == 15)
         printf("Car fueled. Left in the main facility: %d\n", fuel);
     else
         printf("Car not fueled. Left in the main facility: %d\n", fuel);
@@ -71,7 +75,7 @@ int main(int argc, char const *argv[])
         }
     }
     pthread_mutex_destroy(&fuel_mutex);
-    
+    pthread_cond_destroy(&fuel_cond);
     
     return 0;
 }
