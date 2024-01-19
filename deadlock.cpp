@@ -3,41 +3,47 @@
 #include <vector>
 #include <mutex>
 
-// Mutex
-// protects a resource from being accessed simultaneously by multiple thread
-// by locking the resource, only one thread can access it at a time during atomic operations.
+// 2 Threads end up in a deadlock example
+// Thread worker1 tries to lock resource_mutex, and then to unlock it, it needs to lock resource_mutex2
+// Thread worker2 tries to lock resource_mutex2, and then to unlock it, it needs to lock resource_mutex
+// None of the threads is able to unlock their mutexes, so they are stuck in a deadlock
 
 std::mutex resource_mutex; 
 int resource = 0;
+std::mutex resource_mutex2;
+int times = 1000000;
 
 void increment_worker() {
-    int times = 10000;
     while (times > 0){
         resource_mutex.lock();
-        resource_mutex.lock();
+        resource_mutex2.lock();
+        --times;
+        resource_mutex2.unlock();
         resource++;
         resource_mutex.unlock();
-        resource_mutex.unlock();
-        --times;
     }
     printf("Worker done\n");
 }
 
+void decrement_worker() {
+    resource_mutex2.lock();
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    resource_mutex.lock();
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    resource_mutex.unlock();
+    resource_mutex2.unlock();
+}
+
 int main(int argc, char const *argv[])
 {
-    const size_t threads_num = 20;
-    std::vector<std::thread> workers;
-    for (size_t i = 0; i < threads_num; i++)
-    {
-        workers.push_back(std::thread(increment_worker));
-    }
+    std::thread worker1(increment_worker);
+    std::thread worker2(decrement_worker);
     
+    printf("Resource: %d\n", resource);
 
-    for (auto &&worker : workers)
-    {
-        worker.join();
-    }
-    
+    worker1.join();
+    worker2.join();
+
     printf("Resource: %d\n", resource);
 
     return 0;
